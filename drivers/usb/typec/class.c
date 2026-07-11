@@ -1863,6 +1863,11 @@ void typec_set_pwr_opmode(struct typec_port *port,
 			  enum typec_pwr_opmode opmode)
 {
 	struct device *partner_dev;
+	/*A14 code for SR-AL6528V-01-115 by shanxinkai at 20240920 start*/
+	if (port == NULL) {
+		return;
+	}
+	/*A14 code for SR-AL6528V-01-115 by shanxinkai at 20240920 end*/
 
 	if (port->pwr_opmode == opmode)
 		return;

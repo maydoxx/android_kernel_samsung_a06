@@ -723,7 +723,9 @@ config IKHEADERS
 config LOG_BUF_SHIFT
 	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)"
 	range 12 25
-	default 17
+	# A06_V code for SR-AL6528A-01-182 by zhengchao at 20240826 start 
+	default 21
+	# A06_V code for SR-AL6528A-01-182 by zhengchao at 20240826 end 
 	depends on PRINTK
 	help
 	  Select the minimal kernel log buffer size as a power of 2.

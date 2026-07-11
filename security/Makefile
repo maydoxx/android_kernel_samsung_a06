@@ -27,3 +27,9 @@ obj-$(CONFIG_SECURITY_LANDLOCK)		+= landlock/
 
 # Object integrity file lists
 obj-$(CONFIG_INTEGRITY)			+= integrity/
+
+# DEFEX
+obj-$(CONFIG_SECURITY_DEFEX)		+= samsung/defex_lsm/
+
+# KNOX ZT
+obj-$(CONFIG_KZT) += kzt/

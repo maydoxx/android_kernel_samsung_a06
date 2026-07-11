@@ -61,7 +61,7 @@ static void *erofs_read_inode(struct erofs_buf *buf,
 		} else {
 			const unsigned int gotten = sb->s_blocksize - *ofs;
 
-			copied = kmalloc(vi->inode_isize, GFP_NOFS);
+			copied = kmalloc(vi->inode_isize, GFP_KERNEL);
 			if (!copied) {
 				err = -ENOMEM;
 				goto err_out;
@@ -291,7 +291,13 @@ static int erofs_fill_inode(struct inode *inode)
 		goto out_unlock;
 	}
 	inode->i_mapping->a_ops = &erofs_raw_access_aops;
+#ifdef CONFIG_EROFS_ENABLE_LARGE_FOLIOS
+	/*
+	 * Disable large folios because
+	 * cleancache doesn't support large folios yet
+	 */
 	mapping_set_large_folios(inode->i_mapping);
+#endif
 #ifdef CONFIG_EROFS_FS_ONDEMAND
 	if (erofs_is_fscache_mode(inode->i_sb))
 		inode->i_mapping->a_ops = &erofs_fscache_access_aops;

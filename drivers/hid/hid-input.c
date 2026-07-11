@@ -209,6 +209,9 @@ static int hidinput_setkeycode(struct input_dev *dev,
 		usage->type = EV_KEY;
 		usage->code = ke->keycode;
 
+        if (usage->code > KEY_MAX || *old_keycode > KEY_MAX)
+			return -EINVAL;
+
 		clear_bit(*old_keycode, dev->keybit);
 		set_bit(usage->code, dev->keybit);
 		dbg_hid("Assigned keycode %d to HID usage code %x\n",
@@ -806,14 +809,6 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			case 0xe: map_key_clear(KEY_POWER2); break;
 			case 0xf: map_key_clear(KEY_RESTART); break;
 			default: goto unknown;
-			}
-			break;
-		}
-
-		if ((usage->hid & 0xf0) == 0x90) { /* SystemControl*/
-			switch (usage->hid & 0xf) {
-			case 0xb: map_key_clear(KEY_DO_NOT_DISTURB); break;
-			default: goto ignore;
 			}
 			break;
 		}
@@ -1882,6 +1877,7 @@ static void hidinput_close(struct input_dev *dev)
 	hid_hw_close(hid);
 }
 
+#if 0
 static bool __hidinput_change_resolution_multipliers(struct hid_device *hid,
 		struct hid_report *report, bool use_logical_max)
 {
@@ -1962,6 +1958,7 @@ static void hidinput_change_resolution_multipliers(struct hid_device *hid)
 	/* refresh our structs */
 	hid_setup_resolution_multiplier(hid);
 }
+#endif
 
 static void report_features(struct hid_device *hid)
 {
@@ -2327,7 +2324,7 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
 		}
 	}
 
-	hidinput_change_resolution_multipliers(hid);
+	//hidinput_change_resolution_multipliers(hid);
 
 	list_for_each_entry_safe(hidinput, next, &hid->inputs, list) {
 		if (drv->input_configured &&

@@ -153,8 +153,10 @@ static void z_erofs_onlinepage_endio(struct page *page, int err)
 	if (!(v & ~Z_EROFS_PAGE_EIO)) {
 		set_page_private(page, 0);
 		ClearPagePrivate(page);
-		if (!(v & Z_EROFS_PAGE_EIO))
+		if (!(v & Z_EROFS_PAGE_EIO)) {
+			SetPageMappedToDisk(page);
 			SetPageUptodate(page);
+		}
 		unlock_page(page);
 	}
 }
@@ -233,7 +235,7 @@ static int z_erofs_bvec_enqueue(struct z_erofs_bvec_iter *iter,
 		struct page *nextpage = *candidate_bvpage;
 
 		if (!nextpage) {
-			nextpage = erofs_allocpage(pagepool, GFP_NOFS);
+			nextpage = erofs_allocpage(pagepool, GFP_KERNEL);
 			if (!nextpage)
 				return -ENOMEM;
 			set_page_private(nextpage, Z_EROFS_SHORTLIVED_PAGE);
@@ -305,7 +307,7 @@ static struct z_erofs_pcluster *z_erofs_alloc_pcluster(unsigned int size)
 		if (nrpages > pcs->maxpages)
 			continue;
 
-		pcl = kmem_cache_zalloc(pcs->slab, GFP_NOFS);
+		pcl = kmem_cache_zalloc(pcs->slab, GFP_KERNEL);
 		if (!pcl)
 			return ERR_PTR(-ENOMEM);
 		pcl->pclustersize = size;
@@ -699,7 +701,7 @@ static void z_erofs_cache_invalidate_folio(struct folio *folio,
 	DBG_BUGON(stop > folio_size(folio) || stop < length);
 
 	if (offset == 0 && stop == folio_size(folio))
-		while (!z_erofs_cache_release_folio(folio, GFP_NOFS))
+		while (!z_erofs_cache_release_folio(folio, 0))
 			cond_resched();
 }
 
@@ -718,7 +720,7 @@ int erofs_init_managed_cache(struct super_block *sb)
 	set_nlink(inode, 1);
 	inode->i_size = OFFSET_MAX;
 	inode->i_mapping->a_ops = &z_erofs_cache_aops;
-	mapping_set_gfp_mask(inode->i_mapping, GFP_NOFS);
+	mapping_set_gfp_mask(inode->i_mapping, GFP_KERNEL);
 	EROFS_SB(sb)->managed_cache = inode;
 	return 0;
 }
@@ -974,6 +976,10 @@ static int z_erofs_do_read_page(struct z_erofs_decompress_frontend *fe,
 	int err = 0;
 
 	z_erofs_onlinepage_init(page);
+
+	if (cleancache_get_page(page) == 0)
+		goto out;
+
 	split = 0;
 	end = PAGE_SIZE;
 repeat:
@@ -1389,6 +1395,15 @@ static void z_erofs_decompressqueue_kthread_work(struct kthread_work *work)
 }
 #endif
 
+#ifdef CONFIG_MTK_F2FS_DEBUG
+static inline bool z_erofs_need_async_work(void)
+{
+	int rcu_check = rcu_preempt_depth() || !preemptible();
+
+	return !in_task() || irqs_disabled() || rcu_check;
+}
+#endif /* #ifdef CONFIG_MTK_F2FS_DEBUG */
+
 static void z_erofs_decompress_kickoff(struct z_erofs_decompressqueue *io,
 				       int bios)
 {
@@ -1403,8 +1418,11 @@ static void z_erofs_decompress_kickoff(struct z_erofs_decompressqueue *io,
 
 	if (atomic_add_return(bios, &io->pending_bios))
 		return;
-	/* Use (kthread_)work and sync decompression for atomic contexts only */
+#ifdef CONFIG_MTK_F2FS_DEBUG
+	if (z_erofs_need_async_work()) {
+#else
 	if (!in_task() || irqs_disabled() || rcu_read_lock_any_held()) {
+#endif
 #ifdef CONFIG_EROFS_FS_PCPU_KTHREAD
 		struct kthread_worker *worker;
 

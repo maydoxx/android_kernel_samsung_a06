@@ -219,6 +219,9 @@ struct hid_item {
 #define HID_GD_DOWN		0x00010091
 #define HID_GD_RIGHT		0x00010092
 #define HID_GD_LEFT		0x00010093
+/* A06 V code for P250219-02921 & P250219-03658  by dubin at 2025/02/26 start */
+#define HID_GD_DO_NOT_DISTURB	0x0001009b
+/*A06 V  code for P250219-02921 & P250219-03658 by dubin at 20250226 end*/
 /* Microsoft Win8 Wireless Radio Controls CA usage codes */
 #define HID_GD_RFKILL_BTN	0x000100c6
 #define HID_GD_RFKILL_LED	0x000100c7

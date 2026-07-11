@@ -63,6 +63,34 @@
 #include "rdev-ops.h"
 #include "nl80211.h"
 
+/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 start*/
+#include <linux/of.h>
+#include <linux/of_fdt.h>
+#include <linux/of_platform.h>
+
+struct gxy_reg_tag_bootmode {
+	u32 size;
+	u32 tag;
+	u32 bootmode;
+	u32 boottype;
+};
+
+enum gxy_reg_boot_mode_t {
+	NORMAL_BOOT = 0,
+	META_BOOT = 1,
+	RECOVERY_BOOT = 2,
+	SW_REBOOT = 3,
+	FACTORY_BOOT = 4,
+	ADVMETA_BOOT = 5,
+	ATE_FACTORY_BOOT = 6,
+	ALARM_BOOT = 7,
+	KERNEL_POWER_OFF_CHARGING_BOOT = 8,
+	LOW_POWER_OFF_CHARGING_BOOT = 9,
+	DONGLE_BOOT = 10,
+	UNKNOWN_BOOT
+};
+/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 end*/
+
 /*
  * Grace period we give before making sure all current interfaces reside on
  * channels allowed by the current regulatory domain.
@@ -1044,9 +1072,40 @@ static void regdb_fw_cb(const struct firmware *fw, void *context)
 
 MODULE_FIRMWARE("regulatory.db");
 
+/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 start*/
+enum gxy_reg_boot_mode_t gxy_reg_get_boot_mode(void) {
+	struct device_node *np_chosen = NULL;
+	struct gxy_reg_tag_bootmode *tag = NULL;
+	enum gxy_reg_boot_mode_t boot_mode = UNKNOWN_BOOT;
+
+	np_chosen = of_find_node_by_path("/chosen");
+	if (!np_chosen) {
+		np_chosen = of_find_node_by_path("/chosen@0");
+	}
+
+	if (np_chosen) {
+		tag = (struct gxy_reg_tag_bootmode *)of_get_property(
+			np_chosen, "atag,boot", NULL);
+		if (!tag) {
+			pr_err("%s: failed to get atag,boot\n", __func__);
+		} else {
+			pr_info("%s, bootmode:%d\n", __func__, tag->bootmode);
+			boot_mode = tag->bootmode;
+		}
+	} else {
+		pr_err("%s: failed to get /chosen and /chosen@0\n", __func__);
+	}
+
+	return boot_mode;
+}
+/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 end*/
+
 static int query_regdb_file(const char *alpha2)
 {
 	int err;
+
+	/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 start*/
+	enum gxy_reg_boot_mode_t boot_mode = gxy_reg_get_boot_mode();
 
 	ASSERT_RTNL();
 
@@ -1056,10 +1115,18 @@ static int query_regdb_file(const char *alpha2)
 	alpha2 = kmemdup(alpha2, 2, GFP_KERNEL);
 	if (!alpha2)
 		return -ENOMEM;
+	
+	if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+		boot_mode == LOW_POWER_OFF_CHARGING_BOOT) {
+		pr_err("This is lpm, dont load regulatory.db\n");
+		err = -ENOENT;
+	} else {
+		err = request_firmware_nowait(THIS_MODULE, true, "regulatory.db",
+						&reg_pdev->dev, GFP_KERNEL,
+						(void *)alpha2, regdb_fw_cb);
+	}
+	/*A06_V code for SR-AL7160V-01-148 by yexuedong at 20241017 end*/
 
-	err = request_firmware_nowait(THIS_MODULE, true, "regulatory.db",
-				      &reg_pdev->dev, GFP_KERNEL,
-				      (void *)alpha2, regdb_fw_cb);
 	if (err)
 		kfree(alpha2);
 
